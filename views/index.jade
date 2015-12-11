@@ -1,0 +1,48 @@
+doctype html
+html
+	head
+		meta(charset='utf-8')
+		title Recommendation Engine
+
+		link(rel='stylesheet' href='//fonts.googleapis.com/css?family=Asap')
+		link(rel='stylesheet' href='//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.2/css/bootstrap.min.css')
+
+		style(type='text/css').
+			* {
+				font-family: 'Asap';
+			}
+
+	body
+		.container(style='margin-top: 16px;')
+			.row
+				.col-xs-12
+						.col-sm-6
+							h1	Hello, #{user}!
+						h1
+							.pull-right
+						.col-sm-1
+								form(action='/refresh?user=#{user}' method='post')
+									button.btn.btn-primary Refresh
+						.col-sm-1
+								form(action='/logout' method='get')
+									button.btn.btn-primary Logout
+						.col-sm-1
+								form(action='/postad' method='get')
+										button.btn.btn-primary Post Ad
+
+
+
+
+						.row
+							.col-xs-12
+								h2 All Games
+								for game, i in games
+									if i%4 == 0
+										.row
+											for game in games.slice(i, i+4)
+												.col-sm-3
+													.thumbnail
+														img(src='#{game.thumb.url}')
+														.caption
+															h4(style='margin-bottom: 24px; text-overflow: ellipsis; white-space: nowrap; overflow: hidden;') #{game.name}
+															.row

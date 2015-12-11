@@ -1,0 +1,10 @@
+{
+  "name": "Project",
+  "main": "server.js",
+  "dependencies": {
+    "body-parser": "~1.0.1",
+    "express": "~4.8.0",
+    "mongoose": "latest"
+
+  }
+}

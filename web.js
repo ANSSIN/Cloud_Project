@@ -58,9 +58,8 @@ passport.serializeUser(function(user, done) {
       "userName" : user.displayName,
       "userFirstName" : user.name.givenName,
       "userEmail" : user.emails[0].value
-    },
-    { upsert : true }
-    , function(err, result) {
+      },
+      { upsert : true } , function(err, result) {
       if(err) throw err;
       console.log("Updated");
     });
@@ -231,34 +230,26 @@ app.route('/home').get(function(arg, res, next) {
     })(this));
   });
 });
-  app.get('/logout', function(req, res) {
-    req.logout();
-    console.log(req.session);
-
-    console.log("Logged out");
-    console.log(req.user);
-    globalUser = "";
-    res.redirect('/');
-  });
+app.get('/logout', function(req, res) {
+  req.logout();
+  console.log(req.session);
+  console.log("Logged out");
+  console.log(req.user);
+  globalUser = "";
+  res.redirect('/');
+});
 
 app.get('/postad', function(req, res) {
   res.sendfile('./views/newad.html');
 });
 
 app.post('/api/insertAds',function(req,res) {
-  console.log("Inside Insert Ads");
-  console.log(req.body);
-  console.log(req.body.name);
   MongoClient.connect(url, function (err, db) {
     if (err) {
       console.log('Unable to connect to the mongoDB server. Error:', err);
-    } else {
-      //HURRAY!! We are connected. :)
-      console.log('Connection established to', url);
-      /*var request = require("request");
-      request("http://thegamesdb.net/api/GetGame.php?id=8629", function(error, response, body) {
-      console.log(body);
-    });*/
+    }
+    else {
+    console.log('Connection established to', url);
     var gameurl = "http://thegamesdb.net/api/GetGame.php?name=" + req.body.name;
     console.log(gameurl);
     jj = xmlToJson(gameurl, function(err, data) {
@@ -266,114 +257,65 @@ app.post('/api/insertAds',function(req,res) {
         // Handle this however you like
         return console.err(err);
       }
-      console.log(data);
       var gameData = JSON.stringify(data, null, 2);
       var json = JSON.parse(gameData);
       var json2 = JSON.stringify(json);
       var json3 = JSON.parse(json2);
       var json4 = JSON.stringify(json3);
-      //console.log(json3);
       var newId = json3.Data.Game[0].id;
       var newGameTitle = json3.Data.Game[0].GameTitle;
       var newImageUrl1 = json3.Data.baseImgUrl;
       var newImageUrl2 = json3.Data.Game[0].Images[0].boxart[0]['$'].thumb;
       var newImageUrl = newImageUrl1 + newImageUrl2;
-      console.log(newId[0]);
+      var description = json3.Data.Game[0].Overview;
+      var genres = json3.Data.Game[0].Genres;
+      var rating = json3.Data.Game[0].Rating;
       var id = newId[0].toString();
       var GameTitle = newGameTitle[0].toString();
-      //console.log(JSON.stringify(newId));
-      //console.log(json3.Data.Game[0].id);
-
-
-
-      var collection = db.collection('games');
-      //console.log(collection);
-
-      //Create some users
-      var newGame =  { "thumb":{ "url":newImageUrl},"id":id, "name":GameTitle } ;
-      //console.log(newGame);
-      /*var user1 = {name: 'modulus admin', age: 42, roles: ['admin', 'moderator', 'user']};
-      var user2 = {name: 'modulus user', age: 22, roles: ['user']};
-      var user3 = {name: 'modulus super admin', age: 92, roles: ['super-admin', 'admin', 'moderator', 'user']};*/
-      // Insert some users
-      collection.insert(newGame, function (err, result)
-      {
-        if (err)
-        {
-          console.log("ERROR!!!:" + err);
-        } else
-        {
-          console.log('Inserted game into the "games" collection. The game inserted is:', newGame);
-          //db.close();
-        }
-      });
-
-
+      var newGame =  { "thumb": { "url":newImageUrl },"id":id, "name":GameTitle , "description" : description  , "count" : 1 , "genre" : genres[0].genre[0], "rating" : rating } ;
       var jsonfile = require('jsonfile')
       var util = require('util')
       var file = './data/games.json';
       var obj = JSON.parse(fs.readFileSync(file,'utf8'));
-      console.log('before read');
-      console.log(obj);
-      console.log('after read');
+      var count = 0;
+      var exists = false;
+      for (var i = 0; i < obj.length; i++){
+        // look for the entry with a matching `code` value
+        if (obj[i].id == newId){
+          console.log("Matched");
+          console.log(obj[i].count);
+          obj[i].count += 1 ;
+          console.log(obj[i].count);
+          count = obj[i].count;
+          exists = true;
+        }
+      }
+      if(!exists)
+      {
       obj.push(newGame);
-
+      }
+      db.collection('ads').insertOne( { "thumb": { "url":newImageUrl }, "game_name" : req.body.name, "game_owner" : globalUser, "game_platform" : req.body.platform, "game_price" : req.body.price, "game_location" : req.body.location }, function(err, result) {
+            if(err) throw err;
+            console.log("Updated");
+      });
+      db.collection('games').updateOne(
+        {"id" : id },
+        {
+          "thumb": { "url":newImageUrl },"id":id, "name":GameTitle , "description" : description  , "count" : count , "genre" : genres[0].genre[0], "rating" : rating
+        },
+        { upsert : true } , function(err, result) {
+        if(err) throw err;
+        console.log("Updated");
+      });
       jsonfile.writeFile(file, obj, function (err) {
         console.error(err);
         res.redirect('/home');
-      })
+      });
 
-      /*var fs = require('fs');
-      function appendObject(obj){
-      var configFile = fs.readFileSync('./data/games.json');
-      console.log(configFile);
-      var config = JSON.parse(configFile);
-      config.push(newGame);
-      //console.log(config);
-      var configJSON = JSON.stringify(config);
-      fs.writeFileSync('./data/games.json', configJSON);
-    }*/
+    });
 
-
-
-
-    /*for(var iter = 0; iter < json3.Data.Game.length; iter++)
-    {
-    console.log(json3.Data.Game[iter].Platform);
-    if(json3.Data.Game[iter].Platform == 'PC' )
-    {
-    console.log("Hurray");
-    console.log(json3.Data.Game[iter].PlatformId);
-  }
-}*/
-//return json3.Data.Game[0].id;
-//console.log(gameData);
-});
-//console.log(jj);
-db.close();
-// do some work here with the database.
-
-//Close connection
-
-}
-});
-
-
-MongoClient.connect(url, function(err, db) {
-  db.collection('ads').insertOne(
-    {"game_name" : req.body.name,
-    "game_owner" : globalUser,
-    "game_platform" : req.body.platform,
-    "game_price" : req.body.price,
-    "game_location" : req.body.location
-  }
-  , function(err, result) {
-    if(err) throw err;
-    console.log("Updated");
-
+    }
   });
-});
-
 });
 
 function xmlToJson(url, callback) {

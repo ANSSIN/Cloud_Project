@@ -60,7 +60,6 @@ passport.serializeUser(function(user, done) {
       "userName" : user.displayName,
       "userFirstName" : user.name.givenName,
       "userEmail" : user.emails[0].value,
-      "recommendedGames" : "",
       },
       { upsert : true } , function(err, result) {
       if(err) throw err;
@@ -356,7 +355,7 @@ app.post('/api/insertAds',function(req,res) {
         db.collection('Users').updateOne({
           "userEmail" : globalUserEmail},
           {
-            $set : { "recommendedGames" : { $concat : ["$recommendedGames", ",", newId] } }
+            $push : { "recommendedGames" : newId }
           },
           function(err, result) {
           if(err) throw err;

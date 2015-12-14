@@ -8,6 +8,7 @@ _ = require('underscore');
 var MongoClient = require('mongodb').MongoClient;
 var url = 'mongodb://localhost:27017/test';
 var globalUser = "";
+var globalUserEmail = "";
 var Reloader = require('reload-json'),
 reload = new Reloader();
 
@@ -51,13 +52,15 @@ passport.use(new FacebookStrategy({
 }));
 passport.serializeUser(function(user, done) {
   globalUser = user.name.givenName;
+  globalUserEmail = user.emails[0].value;
   MongoClient.connect(url, function(err, db) {
     db.collection('Users').updateOne({
       "userId" : user.id},
       {"userId" : user.id,
       "userName" : user.displayName,
       "userFirstName" : user.name.givenName,
-      "userEmail" : user.emails[0].value
+      "userEmail" : user.emails[0].value,
+      "recommendedGames" : "",
       },
       { upsert : true } , function(err, result) {
       if(err) throw err;
@@ -216,6 +219,8 @@ app.route('/home').get(function(arg, res, next) {
       return function(err, arg1) {
         var dislikes, likes, suggestions;
         likes = arg1.likes, dislikes = arg1.dislikes, suggestions = arg1.suggestions;
+        //Code for content based filtering goes here. Merge it with collaborative filtering.
+
         if (err != null) {
           return next(err);
         }
@@ -251,7 +256,7 @@ app.post('/api/insertAds',function(req,res) {
     else {
     console.log('Connection established to', url);
     var gameurl = "http://thegamesdb.net/api/GetGame.php?name=" + req.body.name;
-    console.log(gameurl);
+    var suggestionGameUrl = "http://www.giantbomb.com/api/search/?query=" + req.body.name+ "&resources=game&api_key=&field_list=name,api_detail_url&limit=5"
     jj = xmlToJson(gameurl, function(err, data) {
       if (err) {
         // Handle this however you like
@@ -313,7 +318,54 @@ app.post('/api/insertAds',function(req,res) {
       });
 
     });
+    console.log("Before sugestions");
+    yy = xmlToJson(suggestionGameUrl, function(err, data) {
+      if (err) {
+        // Handle this however you like
+        return console.err(err);
+      }
+      console.log(suggestionGameUrl);
+      console.log("Inside giantbomb");
+      console.log(data);
+      var gameData = JSON.stringify(data, null, 2);
+      console.log(gameData);
 
+      var json = JSON.parse(gameData);
+      var json2 = JSON.stringify(json);
+      var json3 = JSON.parse(json2);
+      var newId = json3.response.results[0].game[0].name[0];
+      console.log(newId);
+      var getSuggestedGamesUrl = json3.response.results[0].game[0].api_detail_url[0] + "?api_key=&field_list=similar_games&limit=5";
+      zz = xmlToJson(getSuggestedGamesUrl, function(err, data) {
+        if (err) {
+          // Handle this however you like
+          return console.err(err);
+        }
+        console.log(getSuggestedGamesUrl);
+        console.log("Inside inception of Giantbomb");
+        var gameData = JSON.stringify(data, null, 2);
+        console.log(gameData);
+        var json = JSON.parse(gameData);
+        var json2 = JSON.stringify(json);
+        var json3 = JSON.parse(json2);
+        if(json3.response.results[0].similar_games[0])
+        {
+        var newId = json3.response.results[0].similar_games[0].game[0].name[0];
+        console.log(newId);
+        console.log(globalUserEmail);
+        db.collection('Users').updateOne({
+          "userEmail" : globalUserEmail},
+          {
+            $set : { "recommendedGames" : { $concat : ["$recommendedGames", ",", newId] } }
+          },
+          function(err, result) {
+          if(err) throw err;
+          console.log("Updated recommended Games");
+          });
+        }
+
+      });
+    });
     }
   });
 });

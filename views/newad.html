@@ -4,6 +4,9 @@
   <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
   <script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+  <link rel="stylesheet" href="awesomplete.css" />
+
+  <script src="awesomplete.js" async></script>
 </head>
 <body>
 
@@ -20,7 +23,7 @@
           <div class="modal-body" style="padding:40px 50px;">
             <div class="form-group">
               <label for="Name">Name</label>
-              <input type="text" class="form-control" name="name" id="name" placeholder="Enter the name of the video game">
+              <input type="text" class="form-control awesomplete" name="name" id="name" onkeyup="getSimilarGamesList()" placeholder="Enter the name of the video game">
             </div>
             <div class="form-group">
               <label for="Platform">Platform</label>
@@ -39,47 +42,47 @@
         </form>
 
       </div>
-        <script>
-        function getPlaceFromFlickr(lat,lon,callback){
-          // the YQL statement
-          var yql = 'select * from flickr.places where lat='+lat+' and lon='+lon + 'and api_key=7f6776b5a5499c29f23ed4ef968a2ff7';
+      <script>
+      function getPlaceFromFlickr(lat,lon,callback){
+        // the YQL statement
+        var yql = 'select * from flickr.places where lat='+lat+' and lon='+lon + 'and api_key=7f6776b5a5499c29f23ed4ef968a2ff7';
 
-          // assembling the YQL webservice API
-          var url = 'https://query.yahooapis.com/v1/public/yql?q='+
-          encodeURIComponent(yql)+'&format=json&diagnostics='+
-          'false&callback='+callback;
+        // assembling the YQL webservice API
+        var url = 'https://query.yahooapis.com/v1/public/yql?q='+
+        encodeURIComponent(yql)+'&format=json&diagnostics='+
+        'false&callback='+callback;
 
-          // create a new script node and add it to the document
-          var s = document.createElement('script');
-          s.setAttribute('src',url);
-          document.getElementsByTagName('head')[0].appendChild(s);
-        };
+        // create a new script node and add it to the document
+        var s = document.createElement('script');
+        s.setAttribute('src',url);
+        document.getElementsByTagName('head')[0].appendChild(s);
+      };
 
-        // callback in case there is a place found
-        function output(o){
-            if(typeof(o.query.results.places.place) != 'undefined'){
-            var locationElement = document.getElementById('location');
-            locationElement.value  = o.query.results.places.place.name;
-          }
+      // callback in case there is a place found
+      function output(o){
+        if(typeof(o.query.results.places.place) != 'undefined'){
+          var locationElement = document.getElementById('location');
+          locationElement.value  = o.query.results.places.place.name;
         }
+      }
 
 
-        if(navigator.geolocation){
-          // get the current position
-          navigator.geolocation.getCurrentPosition(
-            // if this was successful, get the latitude and longitude
-            function(position){
-              var lat = position.coords.latitude;
-              var lon = position.coords.longitude;
-              console.log(lat);
-              console.log(lon);
-              getPlaceFromFlickr(lat,lon, 'output')
-            },
-            // if there was an error
-            function(error){
-              alert('ouch');
-            });
-          }
+      if(navigator.geolocation){
+        // get the current position
+        navigator.geolocation.getCurrentPosition(
+          // if this was successful, get the latitude and longitude
+          function(position){
+            var lat = position.coords.latitude;
+            var lon = position.coords.longitude;
+            console.log(lat);
+            console.log(lon);
+            getPlaceFromFlickr(lat,lon, 'output')
+          },
+          // if there was an error
+          function(error){
+            alert('ouch');
+          });
+        }
         // call the function with my current lat/lon
         </script>
 
@@ -89,6 +92,70 @@
         $(document).ready(function(){
           $("#myModal").modal();
         });
+        var cors_api_url = 'https://cors-anywhere.herokuapp.com/';
+        function doCORSRequest(options, printResult) {
+          var x = new XMLHttpRequest();
+          x.open(options.method, cors_api_url + options.url);
+          x.onload = x.onerror = function() {
+            printResult(x.responseText);
+
+          };
+          x.send(options.data);
+        }
+        var delay = (function(){
+          var timer = 0;
+          return function(callback, ms){
+            clearTimeout (timer);
+            timer = setTimeout(callback, ms);
+          };
+        })();
+
+        function getSimilarGamesList()
+        {
+          var input = document.getElementById("name");
+          var awesomplete = new Awesomplete(input);
+          awesomplete.open();
+          delay(function(){
+            var nameElement = document.getElementById('name');
+            var gamesListUrl = "http://thegamesdb.net/api/GetGamesList.php?name=" +   nameElement.value;
+            var newgameUrl = "http://www.giantbomb.com/api/search/?query="+nameElement.value+"&resources=game&api_key=f90deb17fc07c0c6f3e13c0c27df28791de111f3&format=json&field_list=name,api_detail_url&limit=10"
+            doCORSRequest({
+              method: 'GET',
+              url: newgameUrl,
+              data: ""
+            }, function printResult(result) {
+
+              console.log(result);
+              var json = JSON.parse(result);
+              var gameList = [];
+              console.log(json.results[0].name);
+              for(i = 0 ; i < json.results.length ; i++)
+              {
+                  gameList.push(json.results[i].name);
+              }
+
+              awesomplete.list = gameList;
+
+
+              document.getElementById("name").focus();
+            });
+          }, 1000);
+          document.getElementById("name").focus();
+          // var script = document.createElement('script');
+          // script.src = gamesListUrl;
+          //
+          // document.getElementsByTagName('head')[0].appendChild(script);
+          // var xhttp = new XMLHttpRequest();
+          // xhttp.onreadystatechange = function() {
+          //   if (xhttp.readyState == 4 && xhttp.status == 200) {
+          //     //document.getElementById("demo").innerHTML = xhttp.responseText;
+          //     console.log(xhttp.responseText);
+          //   }
+          // };
+          // xhttp.open("GET", gamesListUrl, true);
+          // xhttp.send();
+
+        }
 
         </script>
       </div>

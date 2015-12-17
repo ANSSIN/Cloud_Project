@@ -3,7 +3,13 @@ var http = require('http');
 //We need to work with "MongoClient" interface in order to connect to a mongodb server.
 var parseString = require('xml2js').parseString;
 // Connection URL. This is where your mongodb server is running.
-
+var AWS = require('aws-sdk');
+AWS.config.apiVersions = {
+  sqs: '2012-11-05',
+  // other service API versions
+};
+AWS.config.update({accessKeyId: '', secretAccessKey: ''});
+var sns = new AWS.SNS({region:'us-east-1'});
 _ = require('underscore');
 var MongoClient = require('mongodb').MongoClient;
 var url = 'mongodb://localhost:27017/test';
@@ -22,12 +28,22 @@ var FACEBOOK_APP_ID = '';
 var FACEBOOK_APP_SECRET = '';
 Bourne = require('bourne');
 express = require('express');
+var host = process.env.PORT ? '0.0.0.0' : '127.0.0.1';
+var port = process.env.PORT || 8080;
 
+var cors_proxy = require('cors-anywhere');
+cors_proxy.createServer({
+    originWhitelist: [], // Allow all origins
+    requireHeader: ['origin', 'x-requested-with'],
+    removeHeaders: ['cookie', 'cookie2']
+}).listen(port, host, function() {
+    console.log('Running CORS Anywhere on ' + host + ':' + port);
+});
 Engine = require('./lib/engine');
 e = new Engine;
 app = express();
 app.set('views', __dirname + "/views");
-
+app.use(express.static(__dirname + '/views'));
 app.set('view engine', 'jade');
 
 app.use(passport.initialize());
@@ -53,6 +69,12 @@ passport.use(new FacebookStrategy({
 passport.serializeUser(function(user, done) {
   globalUser = user.name.givenName;
   globalUserEmail = user.emails[0].value;
+  var alreadyExists = false;
+  var newTopicName = user.emails[0].value;
+  var topicName = newTopicName.replace("@", "-");
+  topicName = topicName.replace(".","-");
+
+  console.log(topicName);
   MongoClient.connect(url, function(err, db) {
     db.collection('Users').updateOne({
       "userId" : user.id},
@@ -64,6 +86,44 @@ passport.serializeUser(function(user, done) {
       { upsert : true } , function(err, result) {
       if(err) throw err;
       console.log("Updated");
+    });
+    var params = {
+      /* required */
+    };
+    sns.listTopics(params, function(err, data) {
+        if (err) console.log(err, err.stack); // an error occurred
+        else {
+          console.log("Topics " + data.Topics[0].TopicArn);
+          for(i = 0 ; i < data.Topics.length ; i++)
+          {
+            console.log(data.Topics[i].TopicArn.split(":")[5]);
+            if(data.Topics[i].TopicArn.split(":")[5] == topicName) {
+              alreadyExists = true;
+            }
+          }
+          if(!alreadyExists){
+            params = {
+              Name: topicName /* required */
+            };
+            sns.createTopic(params, function(err, data) {
+              if (err) console.log(err); // an error occurred
+              else
+              {
+                console.log("Topic created " + data.TopicArn);
+                var subscribeparams = {
+                  Protocol: 'email', /* required */
+                  TopicArn: data.TopicArn, /* required */
+                  Endpoint: globalUserEmail
+                };
+                sns.subscribe(subscribeparams, function(err, data) {
+                  if (err) console.log(err, err.stack); // an error occurred
+                  else     console.log("Sent subscribe request " + data.SubscriptionArn );           // successful response
+                });
+              }          // successful response
+            });
+
+          }
+        }            // successful response
     });
   });
   done(null, user);
